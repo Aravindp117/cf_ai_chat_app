@@ -6,7 +6,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { Memory } from "./memory";
 import { UserStateDO } from "./durable-objects";
-import { Goal, StudySession, DailyPlan, PlannedTask } from "./types";
+import { Goal, StudySession, DailyPlan, PlannedTask, Topic, calculateMemoryDecayLevel } from "./types";
 
 interface Env {
   AI: any;
@@ -61,8 +61,317 @@ app.get("/", (c) => {
 });
 
 // ============================================================================
-// CHAT API (existing functionality)
+// CHAT API (with command detection)
 // ============================================================================
+
+/**
+ * Command handlers for chat commands
+ */
+async function handleCommand(
+  command: string,
+  userId: string,
+  env: Env
+): Promise<{ reply: string; isCommand: boolean }> {
+  const userStateStub = getUserStateDO(env, userId);
+  const trimmedCommand = command.trim().toLowerCase();
+
+  // !today or !plan - Generate today's plan
+  if (trimmedCommand === "!today" || trimmedCommand === "!plan") {
+    try {
+      const date = new Date().toISOString().split("T")[0];
+      
+      // Check if plan exists
+      const planResponse = await userStateStub.fetch(
+        `https://internal/daily-plans/${date}`,
+        { method: "GET" }
+      );
+
+      if (planResponse.status === 200) {
+        const plan = await planResponse.json<DailyPlan>();
+        const tasksSummary = plan.tasks
+          .map(
+            (t, i) =>
+              `${i + 1}. ${t.type === "review" ? "🔄 Review" : t.type === "study" ? "📚 Study" : "💼 Project"}: ${t.estimatedMinutes} min (Priority: ${"★".repeat(t.priority)}${"☆".repeat(5 - t.priority)})`
+          )
+          .join("\n");
+
+        return {
+          reply: `📅 **Today's Study Plan** (${date})\n\n${plan.reasoning}\n\n**Tasks:**\n${tasksSummary}`,
+          isCommand: true,
+        };
+      } else {
+        // Generate new plan - call the plan generation logic directly
+        const stateResponse = await userStateStub.fetch("https://internal/state", {
+          method: "GET",
+        });
+        
+        if (stateResponse.status === 404) {
+          return {
+            reply: "❌ No user state found. Please create a goal first!",
+            isCommand: true,
+          };
+        }
+
+        const userState = await stateResponse.json<{
+          goals: Goal[];
+          sessions: any[];
+        }>();
+
+        const reviewResponse = await userStateStub.fetch(
+          "https://internal/topics/needing-review",
+          { method: "GET" }
+        );
+        const topicsNeedingReview = await reviewResponse.json<Topic[]>();
+
+        const activeGoals = userState.goals.filter((g) => g.status === "active");
+        
+        if (activeGoals.length === 0) {
+          return {
+            reply: "❌ No active goals found. Create a goal first!",
+            isCommand: true,
+          };
+        }
+
+        // Build prompt for AI
+        const prompt = `You are an AI study planner. Generate a daily study plan for ${date}.
+
+Active Goals:
+${activeGoals
+  .map(
+    (g) =>
+      `- ${g.title} (${g.type}, priority ${g.priority}, deadline: ${g.deadline})`
+  )
+  .join("\n")}
+
+Topics Needing Review:
+${topicsNeedingReview
+  .map((t) => `- ${t.name} (ID: ${t.id}, goal: ${t.goalId})`)
+  .join("\n")}
+
+Generate a focused daily plan with 3-5 tasks. For each task, provide:
+- topicId: the topic ID from above
+- goalId: the goal ID from above
+- type: 'study', 'review', or 'project_work'
+- estimatedMinutes: estimated time in minutes (30-120)
+- priority: 1-5
+- reasoning: why this task is important
+
+Return ONLY a valid JSON object with:
+{
+  "reasoning": "Your overall explanation for this plan",
+  "tasks": [array of task objects]
+}
+
+Do not include any markdown, code blocks, or extra text. Only JSON.`;
+
+        // Call AI using existing binding
+        const aiResponse = await env.AI.run("@cf/meta/llama-3-8b-instruct", {
+          messages: [
+            {
+              role: "system",
+              content:
+                "You are a helpful study planner AI. Always respond with valid JSON only, no markdown, no code blocks, just pure JSON.",
+            },
+            { role: "user", content: prompt },
+          ],
+        });
+
+        let aiResult: { reasoning: string; tasks: PlannedTask[] };
+        try {
+          const aiText = aiResponse?.response || aiResponse?.result || "{}";
+          // Extract JSON from response
+          const jsonMatch =
+            aiText.match(/```json\s*([\s\S]*?)\s*```/) ||
+            aiText.match(/```\s*([\s\S]*?)\s*```/) ||
+            [null, aiText];
+          const jsonText = jsonMatch[1] || jsonMatch[0] || aiText;
+          aiResult = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error("AI response parse error:", parseError);
+          // Fallback plan
+          aiResult = {
+            reasoning:
+              "Generated a basic study plan based on topics needing review.",
+            tasks: topicsNeedingReview.slice(0, 3).map((topic) => ({
+              topicId: topic.id,
+              goalId: topic.goalId,
+              type: "review" as const,
+              estimatedMinutes: 30,
+              priority: 3,
+              reasoning: `Review ${topic.name} to maintain retention`,
+            })),
+          };
+        }
+
+        // Validate tasks
+        const validTasks: PlannedTask[] = [];
+        for (const task of aiResult.tasks || []) {
+          const goal = activeGoals.find((g) => g.id === task.goalId);
+          if (goal) {
+            const topic = goal.topics.find((t) => t.id === task.topicId);
+            if (topic) {
+              validTasks.push(task);
+            }
+          }
+        }
+
+        if (validTasks.length === 0) {
+          return {
+            reply: "❌ Could not generate valid tasks. Please check your goals and topics.",
+            isCommand: true,
+          };
+        }
+
+        // Store the plan
+        const planResponse = await userStateStub.fetch("https://internal/daily-plans", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            date,
+            reasoning: aiResult.reasoning || "AI-generated daily study plan",
+            tasks: validTasks,
+          }),
+        });
+
+        const plan = await planResponse.json<DailyPlan>();
+        const tasksSummary = plan.tasks
+          .map(
+            (t, i) =>
+              `${i + 1}. ${t.type === "review" ? "🔄 Review" : t.type === "study" ? "📚 Study" : "💼 Project"}: ${t.estimatedMinutes} min (Priority: ${"★".repeat(t.priority)}${"☆".repeat(5 - t.priority)})`
+          )
+          .join("\n");
+
+        return {
+          reply: `📅 **Generated Today's Study Plan** (${date})\n\n${plan.reasoning}\n\n**Tasks:**\n${tasksSummary}`,
+          isCommand: true,
+        };
+      }
+    } catch (err) {
+      console.error("Plan generation error:", err);
+      return {
+        reply: "❌ Error generating plan. Please try again.",
+        isCommand: true,
+      };
+    }
+  }
+
+  // !goals - List active goals
+  if (trimmedCommand === "!goals") {
+    try {
+      const response = await userStateStub.fetch(
+        "https://internal/goals/with-decay",
+        { method: "GET" }
+      );
+
+      if (response.status === 404) {
+        return {
+          reply: "📚 You don't have any active goals yet. Create one to get started!",
+          isCommand: true,
+        };
+      }
+
+      const goals = await response.json<Array<Goal & { topicsWithDecay: any[] }>>();
+      const activeGoals = goals.filter((g) => g.status === "active");
+
+      if (activeGoals.length === 0) {
+        return {
+          reply: "📚 You don't have any active goals yet. Create one to get started!",
+          isCommand: true,
+        };
+      }
+
+      const goalsList = activeGoals
+        .map((g, i) => {
+          const daysUntil = Math.ceil(
+            (new Date(g.deadline).getTime() - new Date().getTime()) /
+              (1000 * 60 * 60 * 24)
+          );
+          const urgency = daysUntil < 0 ? "🔴 Overdue" : daysUntil <= 7 ? "🟠 Urgent" : daysUntil <= 14 ? "🟡 Soon" : "🟢 Upcoming";
+          
+          return `${i + 1}. **${g.title}** (${g.type})\n   Priority: ${"★".repeat(g.priority)}${"☆".repeat(5 - g.priority)}\n   Deadline: ${g.deadline.split("T")[0]} (${daysUntil < 0 ? Math.abs(daysUntil) + " days overdue" : daysUntil + " days left"}) ${urgency}\n   Topics: ${g.topics.length}`;
+        })
+        .join("\n\n");
+
+      return {
+        reply: `📚 **Your Active Goals** (${activeGoals.length}):\n\n${goalsList}`,
+        isCommand: true,
+      };
+    } catch (err) {
+      console.error("Get goals error:", err);
+      return {
+        reply: "❌ Error fetching goals. Please try again.",
+        isCommand: true,
+      };
+    }
+  }
+
+  // !review - Get topics needing review
+  if (trimmedCommand === "!review") {
+    try {
+      const response = await userStateStub.fetch(
+        "https://internal/topics/needing-review",
+        { method: "GET" }
+      );
+
+      const topics = await response.json<Topic[]>();
+
+      if (!topics || topics.length === 0) {
+        return {
+          reply: "✅ Great! No topics need review right now. Keep up the good work!",
+          isCommand: true,
+        };
+      }
+
+      const topicsList = topics
+        .slice(0, 10)
+        .map((t, i) => {
+          const decayLevel = t.lastReviewed
+            ? calculateMemoryDecayLevel(t.lastReviewed, t.reviewCount)
+            : "red";
+          const decayEmoji =
+            decayLevel === "red"
+              ? "🔴"
+              : decayLevel === "orange"
+              ? "🟠"
+              : decayLevel === "yellow"
+              ? "🟡"
+              : "🟢";
+
+          return `${i + 1}. ${decayEmoji} **${t.name}**\n   Mastery: ${t.masteryLevel}% | Reviews: ${t.reviewCount}${t.lastReviewed ? ` | Last: ${new Date(t.lastReviewed).toLocaleDateString()}` : ""}`;
+        })
+        .join("\n\n");
+
+      return {
+        reply: `🔄 **Topics Needing Review** (${topics.length}):\n\n${topicsList}${topics.length > 10 ? `\n\n...and ${topics.length - 10} more` : ""}`,
+        isCommand: true,
+      };
+    } catch (err) {
+      console.error("Get review topics error:", err);
+      return {
+        reply: "❌ Error fetching review topics. Please try again.",
+        isCommand: true,
+      };
+    }
+  }
+
+  // !help - Show available commands
+  if (trimmedCommand === "!help" || trimmedCommand === "!commands") {
+    return {
+      reply: `🤖 **Available Commands:**
+
+\`!today\` or \`!plan\` - Show or generate today's study plan
+\`!goals\` - List all your active goals
+\`!review\` - Show topics that need review
+\`!help\` - Show this help message
+
+You can also chat normally with me about your studies!`,
+      isCommand: true,
+    };
+  }
+
+  // Not a recognized command
+  return { reply: "", isCommand: false };
+}
 
 app.post("/api/chat", async (c) => {
   try {
@@ -73,6 +382,15 @@ app.post("/api/chat", async (c) => {
       return c.json({ error: "`message` is required (string)" }, 400);
     }
 
+    // Check for commands first
+    const commandResult = await handleCommand(message, userId, c.env);
+
+    if (commandResult.isCommand) {
+      // Return command response directly
+      return c.json({ reply: commandResult.reply });
+    }
+
+    // Not a command, pass through to conversational AI
     const stub = getMemoryDO(c.env, userId);
     const doResponse = await stub.fetch("https://internal/chat", {
       method: "POST",
@@ -385,13 +703,13 @@ Return a JSON object with:
 
 Format your response as valid JSON only.`;
 
-    // Call AI
+    // Call AI using existing Workers AI binding
     const aiResponse = await c.env.AI.run("@cf/meta/llama-3-8b-instruct", {
       messages: [
         {
           role: "system",
           content:
-            "You are a helpful study planner AI. Always respond with valid JSON only.",
+            "You are a helpful study planner AI. Always respond with valid JSON only, no markdown, no code blocks, just pure JSON.",
         },
         { role: "user", content: prompt },
       ],
