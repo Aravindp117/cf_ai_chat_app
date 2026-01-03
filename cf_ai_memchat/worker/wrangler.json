@@ -7,7 +7,8 @@
 
   "durable_objects": {
     "bindings": [
-      { "name": "MEM_CHAT", "class_name": "Memory" }
+      { "name": "MEM_CHAT", "class_name": "Memory" },
+      { "name": "USER_STATE", "class_name": "UserStateDO" }
     ]
   },
 
@@ -15,6 +16,10 @@
     {
       "tag": "v1",
       "new_sqlite_classes": ["Memory"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["UserStateDO"]
     }
   ]
 }
