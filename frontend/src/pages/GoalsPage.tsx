@@ -154,10 +154,12 @@ export default function GoalsPage() {
               </h2>
               <form onSubmit={handleCreate} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="goal-title" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Title
                   </label>
                   <input
+                    id="goal-title"
+                    name="title"
                     type="text"
                     value={formData.title}
                     onChange={(e) => setFormData({ ...formData, title: e.target.value })}
@@ -166,10 +168,12 @@ export default function GoalsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="goal-type" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Type
                   </label>
                   <select
+                    id="goal-type"
+                    name="type"
                     value={formData.type}
                     onChange={(e) =>
                       setFormData({
@@ -185,10 +189,12 @@ export default function GoalsPage() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="goal-deadline" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Deadline
                   </label>
                   <input
+                    id="goal-deadline"
+                    name="deadline"
                     type="date"
                     value={formData.deadline}
                     onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
@@ -197,10 +203,12 @@ export default function GoalsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="goal-priority" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Priority (1-5)
                   </label>
                   <input
+                    id="goal-priority"
+                    name="priority"
                     type="number"
                     min="1"
                     max="5"
@@ -213,10 +221,12 @@ export default function GoalsPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  <label htmlFor="goal-topics" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                     Topics (comma-separated)
                   </label>
                   <input
+                    id="goal-topics"
+                    name="topics"
                     type="text"
                     value={formData.topics}
                     onChange={(e) => setFormData({ ...formData, topics: e.target.value })}

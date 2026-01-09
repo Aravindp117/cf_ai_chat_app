@@ -218,7 +218,12 @@ function Chat() {
       {/* Input Area */}
       <div className="border-t border-gray-300 dark:border-gray-600 p-4 bg-white dark:bg-gray-800">
         <div className="flex space-x-2">
+          <label htmlFor="chat-message-input" className="sr-only">
+            Chat message input
+          </label>
           <input
+            id="chat-message-input"
+            name="message"
             ref={inputRef}
             type="text"
             value={inputText}
@@ -227,8 +232,10 @@ function Chat() {
             placeholder="Type your message..."
             disabled={isLoading}
             className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+            autoComplete="off"
           />
           <button
+            type="button"
             onClick={sendMessage}
             disabled={isLoading || !inputText.trim()}
             className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"

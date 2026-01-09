@@ -77,10 +77,12 @@ export default function StudySessionModal({
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="session-goal" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Goal
             </label>
             <select
+              id="session-goal"
+              name="goalId"
               value={selectedGoalId}
               onChange={(e) => {
                 setSelectedGoalId(e.target.value);
@@ -101,10 +103,12 @@ export default function StudySessionModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="session-topic" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Topic
             </label>
             <select
+              id="session-topic"
+              name="topicId"
               value={selectedTopicId}
               onChange={(e) => setSelectedTopicId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
@@ -121,10 +125,12 @@ export default function StudySessionModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="session-duration" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Duration (minutes)
             </label>
             <input
+              id="session-duration"
+              name="durationMinutes"
               type="number"
               min="1"
               max="480"
@@ -136,10 +142,12 @@ export default function StudySessionModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            <label htmlFor="session-notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Notes (optional)
             </label>
             <textarea
+              id="session-notes"
+              name="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={3}
