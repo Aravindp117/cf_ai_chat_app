@@ -133,9 +133,11 @@ export default function Calendar({ viewMode: initialViewMode = 'week' }: Calenda
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Study Calendar</h2>
-            <p className="text-lg text-gray-600 dark:text-gray-400 mt-1">
-              {format(currentDate, 'MMMM yyyy')}
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Study Calendar - {format(currentDate, 'MMMM yyyy')}
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              Click a date to view or create a plan
             </p>
           </div>
           <div className="flex gap-2">

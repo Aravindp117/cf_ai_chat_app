@@ -242,13 +242,68 @@ export class UserStateDO {
     topic.lastReviewed = sessionData.date;
     topic.reviewCount += 1;
 
-    // Optionally update mastery level based on session duration
-    // Simple heuristic: longer sessions = more mastery
-    const masteryIncrease = Math.min(
-      5,
-      Math.floor(sessionData.durationMinutes / 30)
-    );
-    topic.masteryLevel = Math.min(100, topic.masteryLevel + masteryIncrease);
+    // More realistic mastery level calculation
+    // Factors:
+    // 1. Review count (diminishing returns - early reviews matter more)
+    // 2. Session duration (longer sessions = more mastery)
+    // 3. Current mastery level (harder to improve when already high)
+    
+    let baseIncrease = 0;
+    
+    // Base increase based on review count (early reviews give more mastery)
+    // This creates a realistic progression where initial reviews are very effective
+    if (topic.reviewCount === 1) {
+      // First review: significant boost (20%)
+      baseIncrease = 20;
+    } else if (topic.reviewCount === 2) {
+      // Second review: still very effective (18%)
+      baseIncrease = 18;
+    } else if (topic.reviewCount <= 5) {
+      // Reviews 3-5: good increase (12-15%)
+      baseIncrease = 12 + (5 - topic.reviewCount); // 15% for 3rd, 14% for 4th, 12% for 5th
+    } else if (topic.reviewCount <= 10) {
+      // Reviews 6-10: moderate increase (8-11%)
+      baseIncrease = 8 + Math.floor((10 - topic.reviewCount) * 0.6); // Decreasing from 11% to 8%
+    } else if (topic.reviewCount <= 20) {
+      // Reviews 11-20: smaller increase (5-7%)
+      baseIncrease = 5 + Math.floor((20 - topic.reviewCount) * 0.2); // Decreasing from 7% to 5%
+    } else {
+      // After 20 reviews: minimal but consistent increase (3-5%)
+      baseIncrease = 3 + Math.floor((topic.reviewCount <= 30 ? 30 - topic.reviewCount : 0) * 0.2);
+      baseIncrease = Math.max(3, baseIncrease); // Never below 3%
+    }
+    
+    // Adjust based on session duration (longer sessions help more)
+    // This encourages thorough study sessions
+    let durationBonus = 0;
+    if (sessionData.durationMinutes >= 90) {
+      durationBonus = 8; // +8% for 90+ minute sessions
+    } else if (sessionData.durationMinutes >= 60) {
+      durationBonus = 5; // +5% for 60-89 minute sessions
+    } else if (sessionData.durationMinutes >= 45) {
+      durationBonus = 3; // +3% for 45-59 minute sessions
+    } else if (sessionData.durationMinutes >= 30) {
+      durationBonus = 1; // +1% for 30-44 minute sessions
+    }
+    // Below 30 minutes: no bonus (minimum effort threshold)
+    
+    let masteryIncrease = baseIncrease + durationBonus;
+    
+    // Diminishing returns: harder to improve when already high mastery
+    // This prevents unrealistic jumps from 95% to 100% in one session
+    if (topic.masteryLevel >= 95) {
+      masteryIncrease = Math.floor(masteryIncrease * 0.2); // 20% effectiveness at 95%+
+    } else if (topic.masteryLevel >= 85) {
+      masteryIncrease = Math.floor(masteryIncrease * 0.4); // 40% effectiveness at 85-94%
+    } else if (topic.masteryLevel >= 70) {
+      masteryIncrease = Math.floor(masteryIncrease * 0.6); // 60% effectiveness at 70-84%
+    } else if (topic.masteryLevel >= 50) {
+      masteryIncrease = Math.floor(masteryIncrease * 0.8); // 80% effectiveness at 50-69%
+    }
+    // Below 50%: full effectiveness (100%)
+    
+    // Ensure we always make some progress (minimum 1%) and cap at 100%
+    topic.masteryLevel = Math.min(100, topic.masteryLevel + Math.max(1, masteryIncrease));
 
     // Remove matching tasks from daily plans
     // Match by topicId and goalId for the same date as the session
