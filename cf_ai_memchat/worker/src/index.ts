@@ -390,6 +390,7 @@ app.post("/api/goals", async (c) => {
 app.get("/api/goals", async (c) => {
   try {
     const userId = c.get("userId");
+    console.log("Worker: GET /api/goals - userId:", userId);
     const stub = getUserStateDO(c.env, userId);
 
     const response = await stub.fetch("https://internal/goals/with-decay", {
@@ -397,14 +398,15 @@ app.get("/api/goals", async (c) => {
     });
 
     if (response.status === 404) {
-      return c.json({ goals: [] }, 200);
+      return c.json([]); // Return empty array directly
     }
 
-    const goals = await response.json();
+    const goals = await response.json<Goal[]>();
+    console.log("Worker: GET /api/goals - Returning", goals.length, "goals with IDs:", goals.map(g => g.id));
     return c.json(goals, response.status);
-  } catch (err) {
+  } catch (err: any) {
     console.error("Get goals error:", err);
-    return c.json({ error: "Internal server error" }, 500);
+    return c.json({ error: err.message || "Internal server error" }, 500);
   }
 });
 
@@ -449,9 +451,19 @@ app.delete("/api/goals/:id", async (c) => {
       return c.json({ error: "Goal ID is required" }, 400);
     }
 
-    console.log("Deleting goal:", goalId, "for user:", userId);
+    console.log("Worker: DELETE /api/goals/:id - userId:", userId, "goalId:", goalId);
 
+    // First, get all goals to see what IDs exist
     const stub = getUserStateDO(c.env, userId);
+    const checkResponse = await stub.fetch("https://internal/goals/with-decay", {
+      method: "GET",
+    });
+    
+    if (checkResponse.ok) {
+      const existingGoals = await checkResponse.json<Goal[]>();
+      console.log("Worker: Existing goal IDs before delete:", existingGoals.map(g => g.id));
+    }
+
     const response = await stub.fetch(`https://internal/goals/${goalId}`, {
       method: "DELETE",
     });
@@ -459,16 +471,20 @@ app.delete("/api/goals/:id", async (c) => {
     const responseData = await response.json().catch(() => ({ error: "Failed to parse response" }));
 
     if (response.status === 404) {
+      console.error("Worker: Goal not found. Response:", responseData);
       return c.json({ error: responseData.error || "Goal not found" }, 404);
     }
 
     if (!response.ok) {
+      console.error("Worker: Delete failed with status", response.status, "Response:", responseData);
       return c.json({ error: responseData.error || "Failed to delete goal" }, response.status);
     }
 
+    console.log("Worker: Successfully deleted goal:", goalId);
     return c.json({ success: true }, 200);
   } catch (err: any) {
-    console.error("Delete goal error:", err);
+    console.error("Worker: Delete goal error:", err);
+    console.error("Error stack:", err.stack);
     return c.json({ error: err.message || "Internal server error" }, 500);
   }
 });

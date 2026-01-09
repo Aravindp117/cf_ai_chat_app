@@ -585,6 +585,8 @@ export class UserStateDO {
       // GET /goals/with-decay - Get goals with decay information
       if (path === "/goals/with-decay" && method === "GET") {
         const goals = await this.getGoalsWithDecay();
+        console.log("Durable Object: GET /goals/with-decay - Returning", goals.length, "goals");
+        console.log("Durable Object: Goal IDs:", goals.map(g => g.id));
         return new Response(JSON.stringify(goals), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
