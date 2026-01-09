@@ -56,8 +56,8 @@ export const goalsApi = {
       const errorData = await response.json().catch(() => ({ error: 'Failed to fetch goals' }));
       throw new Error(errorData.error || `Failed to fetch goals: ${response.statusText}`);
     }
-    const goals = await response.json<Goal[]>();
-    console.log('Frontend: Received goals:', goals.length, 'Goal IDs:', goals.map(g => g.id));
+    const goals = (await response.json()) as Goal[];
+    console.log('Frontend: Received goals:', goals.length, 'Goal IDs:', goals.map((g: Goal) => g.id));
     return goals;
   },
 
