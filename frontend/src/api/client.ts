@@ -47,11 +47,18 @@ export const goalsApi = {
   },
 
   async getAll(): Promise<Goal[]> {
-    const response = await fetch(`${API_URL}/api/goals?userId=${getUserId()}`, {
+    const userId = getUserId();
+    console.log('Frontend: Fetching goals for userId:', userId);
+    const response = await fetch(`${API_URL}/api/goals?userId=${userId}`, {
       headers: getHeaders(),
     });
-    if (!response.ok) throw new Error('Failed to fetch goals');
-    return response.json();
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Failed to fetch goals' }));
+      throw new Error(errorData.error || `Failed to fetch goals: ${response.statusText}`);
+    }
+    const goals = await response.json<Goal[]>();
+    console.log('Frontend: Received goals:', goals.length, 'Goal IDs:', goals.map(g => g.id));
+    return goals;
   },
 
   async update(id: string, updates: Partial<Goal>): Promise<Goal> {
@@ -65,14 +72,18 @@ export const goalsApi = {
   },
 
   async delete(id: string): Promise<void> {
-    const response = await fetch(`${API_URL}/api/goals/${id}`, {
+    const userId = getUserId();
+    console.log('Frontend: Deleting goal with id:', id, 'for userId:', userId);
+    const response = await fetch(`${API_URL}/api/goals/${id}?userId=${userId}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Failed to delete goal' }));
+      console.error('Frontend: Delete goal failed:', errorData, 'Status:', response.status);
       throw new Error(errorData.error || `Failed to delete goal: ${response.statusText}`);
     }
+    console.log('Frontend: Successfully deleted goal:', id);
   },
 };
 
