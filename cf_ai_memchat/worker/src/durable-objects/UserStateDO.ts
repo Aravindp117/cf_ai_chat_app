@@ -156,6 +156,7 @@ export class UserStateDO {
     }));
 
     await this.setState(state);
+    console.log("deleteGoal: Successfully deleted goal:", goalId);
   }
 
   /**
