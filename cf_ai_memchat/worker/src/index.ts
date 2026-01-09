@@ -401,8 +401,11 @@ app.get("/api/goals", async (c) => {
       return c.json([]); // Return empty array directly
     }
 
-    const goals = await response.json<Goal[]>();
-    console.log("Worker: GET /api/goals - Returning", goals.length, "goals with IDs:", goals.map(g => g.id));
+    const goals = await response.json() as Goal[];
+    console.log("Worker: GET /api/goals - Returning", goals.length, "goals");
+    if (goals.length > 0) {
+      console.log("Worker: Goal IDs:", goals.map((g: Goal) => g.id));
+    }
     return c.json(goals, response.status);
   } catch (err: any) {
     console.error("Get goals error:", err);
