@@ -76,15 +76,29 @@ export class UserStateDO {
 
   /**
    * Adds a new goal to the user state
+   * Accepts topics without id and goalId - these will be generated
    */
-  async addGoal(goalData: Omit<Goal, "id" | "createdAt">): Promise<Goal> {
+  async addGoal(goalData: Omit<Goal, "id" | "createdAt"> & { topics: Omit<Topic, "id" | "goalId">[] }): Promise<Goal> {
     const state = await this.getState();
 
-    const newGoal: Goal = {
-      ...goalData,
+    const goalId = this.generateId();
+    
+    // Create Topic objects with IDs and goalId
+    const topics: Topic[] = (goalData.topics || []).map((topicData) => ({
+      ...topicData,
       id: this.generateId(),
+      goalId,
+    }));
+
+    const newGoal: Goal = {
+      title: goalData.title,
+      type: goalData.type,
+      deadline: goalData.deadline,
+      priority: goalData.priority,
+      status: goalData.status,
+      id: goalId,
       createdAt: new Date().toISOString(),
-      topics: goalData.topics || [],
+      topics,
     };
 
     state.goals.push(newGoal);

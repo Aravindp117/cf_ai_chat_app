@@ -340,21 +340,19 @@ app.post("/api/goals", async (c) => {
       return c.json({ error: "priority must be between 1 and 5" }, 400);
     }
 
-    // Convert topic names to Topic objects
-    const topics = (body.topics || []).map((name) => ({
-      name,
-      lastReviewed: null,
-      reviewCount: 0,
-      masteryLevel: 0,
-      notes: "",
-    }));
-
+    // Prepare goal data (topics will be created in addGoal)
     const goalData = {
       title: body.title,
       type: body.type,
       deadline: body.deadline,
       priority: body.priority,
-      topics,
+      topics: (body.topics || []).map((name) => ({
+        name,
+        lastReviewed: null,
+        reviewCount: 0,
+        masteryLevel: 0,
+        notes: "",
+      })),
       status: "active" as const,
     };
 
@@ -365,11 +363,16 @@ app.post("/api/goals", async (c) => {
       body: JSON.stringify(goalData),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Failed to create goal" }));
+      return c.json({ error: errorData.error || "Failed to create goal" }, response.status);
+    }
+
     const goal = await response.json<Goal>();
     return c.json(goal, response.status);
-  } catch (err) {
+  } catch (err: any) {
     console.error("Create goal error:", err);
-    return c.json({ error: "Internal server error" }, 500);
+    return c.json({ error: err.message || "Internal server error" }, 500);
   }
 });
 
