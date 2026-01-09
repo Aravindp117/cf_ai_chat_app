@@ -137,26 +137,38 @@ export class UserStateDO {
    */
   async deleteGoal(goalId: string): Promise<void> {
     const state = await this.getState();
-    const goalIndex = state.goals.findIndex((g) => g.id === goalId);
+    const trimmedGoalId = goalId.trim();
+
+    console.log("deleteGoal: Looking for goal with id:", JSON.stringify(trimmedGoalId));
+    console.log("deleteGoal: Available goal IDs:", state.goals.map(g => JSON.stringify(g.id)).join(", ") || "none");
+    console.log("deleteGoal: Total goals:", state.goals.length);
+
+    const goalIndex = state.goals.findIndex((g) => {
+      return g.id === trimmedGoalId || g.id === goalId || g.id.trim() === trimmedGoalId;
+    });
 
     if (goalIndex === -1) {
-      throw new Error(`Goal with id ${goalId} not found`);
+      const errorMsg = `Goal with id "${trimmedGoalId}" not found. Available goals: ${state.goals.map(g => `"${g.id}"`).join(", ") || "none"}`;
+      console.error("deleteGoal:", errorMsg);
+      throw new Error(errorMsg);
     }
+
+    console.log("deleteGoal: Found matching goal at index", goalIndex, "with id:", JSON.stringify(state.goals[goalIndex].id));
 
     // Remove goal
     state.goals.splice(goalIndex, 1);
 
     // Remove sessions associated with this goal
-    state.sessions = state.sessions.filter((s) => s.goalId !== goalId);
+    state.sessions = state.sessions.filter((s) => s.goalId !== trimmedGoalId && s.goalId !== goalId);
 
     // Remove tasks from daily plans that reference this goal
     state.dailyPlans = state.dailyPlans.map((plan) => ({
       ...plan,
-      tasks: plan.tasks.filter((task) => task.goalId !== goalId),
+      tasks: plan.tasks.filter((task) => task.goalId !== trimmedGoalId && task.goalId !== goalId),
     }));
 
     await this.setState(state);
-    console.log("deleteGoal: Successfully deleted goal:", goalId);
+    console.log("deleteGoal: Successfully deleted goal:", trimmedGoalId);
   }
 
   /**
