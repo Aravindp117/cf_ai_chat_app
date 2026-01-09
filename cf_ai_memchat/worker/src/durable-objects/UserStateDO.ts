@@ -417,8 +417,8 @@ export class UserStateDO {
       // DELETE /goals/:id - Delete a goal
       // Must check DELETE before POST /goals/:id/topics to avoid path conflicts
       if (path.startsWith("/goals/") && method === "DELETE" && !path.includes("/topics")) {
-        const goalId = path.replace("/goals/", "").split("/")[0]; // Extract goalId, ignoring any trailing paths
-        if (!goalId || goalId.trim() === "") {
+        const goalId = path.replace("/goals/", "").split("/")[0].trim(); // Extract goalId, ignoring any trailing paths
+        if (!goalId) {
           return new Response(
             JSON.stringify({ error: "Goal ID required" }),
             {
@@ -428,7 +428,7 @@ export class UserStateDO {
           );
         }
         try {
-          console.log("Durable Object: Attempting to delete goal:", goalId);
+          console.log("Durable Object: DELETE route - path:", path, "extracted goalId:", goalId);
           await this.deleteGoal(goalId);
           return new Response(JSON.stringify({ success: true }), {
             status: 200,
