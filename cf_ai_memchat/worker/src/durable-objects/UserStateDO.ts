@@ -404,13 +404,15 @@ export class UserStateDO {
       if (path === "/goals" && method === "POST") {
         try {
           const body = await request.json();
+          console.log("Durable Object: Received create goal request:", JSON.stringify(body));
           const goal = await this.addGoal(body);
           return new Response(JSON.stringify(goal), {
             status: 201,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         } catch (error: any) {
-          console.error("Error in addGoal:", error);
+          console.error("Durable Object: Error in addGoal:", error);
+          console.error("Error stack:", error.stack);
           return new Response(
             JSON.stringify({ error: error.message || "Failed to create goal" }),
             {
