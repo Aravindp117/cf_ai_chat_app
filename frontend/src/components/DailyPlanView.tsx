@@ -49,13 +49,13 @@ export default function DailyPlanView({ plan, onRefresh }: DailyPlanViewProps) {
   const remainingMinutes = totalMinutes % 60;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <div className="flex justify-between items-start mb-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4 mb-4">
+        <div className="flex-1 min-w-0">
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mb-2">
             Today's Study Plan
           </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
             {new Date(plan.date).toLocaleDateString('en-US', {
               weekday: 'long',
               year: 'numeric',
@@ -66,7 +66,7 @@ export default function DailyPlanView({ plan, onRefresh }: DailyPlanViewProps) {
         </div>
         <button
           onClick={handleGenerate}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm sm:text-base font-medium transition-colors whitespace-nowrap flex-shrink-0"
         >
           Regenerate
         </button>
