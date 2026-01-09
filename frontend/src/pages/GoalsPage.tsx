@@ -127,7 +127,7 @@ export default function GoalsPage() {
             onClick={() => setShowCreateModal(true)}
             className="px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base whitespace-nowrap flex-shrink-0 self-start sm:self-auto"
           >
-            + Create Goal
+            + New Goal
           </button>
         </div>
 

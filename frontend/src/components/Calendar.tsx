@@ -8,19 +8,21 @@ import { useApp } from '../context/AppContext';
 import { DailyPlan } from '../types';
 import { plansApi } from '../api/client';
 import StudySessionModal from './StudySessionModal';
+import toast from 'react-hot-toast';
 
 interface CalendarProps {
   viewMode?: 'week' | 'month';
 }
 
 export default function Calendar({ viewMode: initialViewMode = 'week' }: CalendarProps) {
-  const { dailyPlans } = useApp();
+  const { dailyPlans, refreshAll } = useApp();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'week' | 'month'>(initialViewMode);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [loadingDates, setLoadingDates] = useState<Set<string>>(new Set());
   const [loadedPlans, setLoadedPlans] = useState<Map<string, DailyPlan>>(new Map());
+  const [generatingPlan, setGeneratingPlan] = useState<string | null>(null);
 
   // Load plans for visible dates
   useEffect(() => {
@@ -304,12 +306,42 @@ export default function Calendar({ viewMode: initialViewMode = 'week' }: Calenda
       </div>
 
       {/* Selected date details */}
-      {selectedDate && allPlans.has(selectedDate) && (
+      {selectedDate && (
         <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
-          <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
-            {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')}
-          </h3>
-          {allPlans.get(selectedDate) && (
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 mb-4">
+            <h3 className="font-semibold text-gray-900 dark:text-white">
+              {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')}
+            </h3>
+            {!allPlans.has(selectedDate) && (
+              <button
+                onClick={async () => {
+                  if (!selectedDate) return;
+                  setGeneratingPlan(selectedDate);
+                  try {
+                    const generatedPlan = await plansApi.generate(selectedDate);
+                    toast.success(`Plan generated for ${format(parseISO(selectedDate), 'MMMM d, yyyy')}`);
+                    // Add the generated plan to loaded plans
+                    setLoadedPlans((prev) => {
+                      const newMap = new Map(prev);
+                      newMap.set(selectedDate, generatedPlan);
+                      return newMap;
+                    });
+                    refreshAll();
+                  } catch (error: any) {
+                    console.error('Failed to generate plan:', error);
+                    toast.error(error.message || 'Failed to generate plan. Please try again.');
+                  } finally {
+                    setGeneratingPlan(null);
+                  }
+                }}
+                disabled={generatingPlan === selectedDate}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base whitespace-nowrap flex-shrink-0 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {generatingPlan === selectedDate ? 'Generating...' : 'Generate Plan'}
+              </button>
+            )}
+          </div>
+          {allPlans.has(selectedDate) && allPlans.get(selectedDate) ? (
             <div>
               <p className="text-sm text-gray-700 dark:text-gray-300 mb-3">
                 {allPlans.get(selectedDate)!.reasoning}
@@ -332,6 +364,15 @@ export default function Calendar({ viewMode: initialViewMode = 'week' }: Calenda
                   </div>
                 ))}
               </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <p className="text-gray-500 dark:text-gray-400 mb-4">
+                No plan generated for this date yet.
+              </p>
+              <p className="text-sm text-gray-400 dark:text-gray-500">
+                Click "Generate Plan" above to create an AI-powered study plan.
+              </p>
             </div>
           )}
         </div>
