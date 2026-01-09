@@ -102,33 +102,27 @@ export default function GoalsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-4">
       <div className="max-w-6xl mx-auto">
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2">
               My Goals
             </h1>
-            <p className="text-gray-600 dark:text-gray-400">
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-400">
               Manage your study goals and track progress
             </p>
           </div>
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-          >
-            + New Goal
-          </button>
-        </div>
-
-        <div className="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Active Goals ({activeGoals.length})
-          </h2>
           <button
             onClick={() => setShowCreateModal(true)}
             className="px-4 sm:px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors text-sm sm:text-base whitespace-nowrap flex-shrink-0 self-start sm:self-auto"
           >
             + New Goal
           </button>
+        </div>
+
+        <div className="mb-6">
+          <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 dark:text-white">
+            Active Goals ({activeGoals.length})
+          </h2>
         </div>
 
         {activeGoals.length > 0 && (
