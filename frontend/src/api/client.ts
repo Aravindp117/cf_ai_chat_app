@@ -39,7 +39,10 @@ export const goalsApi = {
       headers: getHeaders(),
       body: JSON.stringify(goal),
     });
-    if (!response.ok) throw new Error('Failed to create goal');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Failed to create goal' }));
+      throw new Error(errorData.error || `Failed to create goal: ${response.statusText}`);
+    }
     return response.json();
   },
 
@@ -100,12 +103,16 @@ export const plansApi = {
   },
 
   async generate(date?: string): Promise<DailyPlan> {
+    const targetDate = date || new Date().toISOString().split('T')[0];
     const response = await fetch(`${API_URL}/api/plan/generate?userId=${getUserId()}`, {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify({ date: date || new Date().toISOString().split('T')[0] }),
+      body: JSON.stringify({ date: targetDate }),
     });
-    if (!response.ok) throw new Error('Failed to generate plan');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Failed to generate plan' }));
+      throw new Error(errorData.error || `Failed to generate plan: ${response.statusText}`);
+    }
     return response.json();
   },
 };

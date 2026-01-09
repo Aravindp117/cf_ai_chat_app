@@ -28,10 +28,20 @@ export default function GoalsPage() {
         .map((t) => t.trim())
         .filter((t) => t.length > 0);
 
+      // Convert date to ISO string
+      const deadlineISO = formData.deadline
+        ? new Date(formData.deadline + 'T00:00:00Z').toISOString()
+        : '';
+
+      if (!deadlineISO) {
+        alert('Please select a deadline');
+        return;
+      }
+
       await goalsApi.create({
         title: formData.title,
         type: formData.type,
-        deadline: formData.deadline,
+        deadline: deadlineISO,
         priority: formData.priority,
         topics,
       });
@@ -47,7 +57,8 @@ export default function GoalsPage() {
       refreshAll();
     } catch (error) {
       console.error('Failed to create goal:', error);
-      alert('Failed to create goal. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create goal. Please try again.';
+      alert(errorMessage);
     }
   };
 

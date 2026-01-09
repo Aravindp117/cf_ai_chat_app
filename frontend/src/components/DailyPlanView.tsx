@@ -16,12 +16,15 @@ export default function DailyPlanView({ plan, onRefresh }: DailyPlanViewProps) {
 
   const handleGenerate = async () => {
     try {
-      await plansApi.generate();
+      const today = new Date().toISOString().split('T')[0];
+      const generatedPlan = await plansApi.generate(today);
       refreshTodayPlan();
       if (onRefresh) onRefresh();
+      console.log('Plan generated successfully:', generatedPlan);
     } catch (error) {
       console.error('Failed to generate plan:', error);
-      alert('Failed to generate plan. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate plan. Please try again.';
+      alert(errorMessage);
     }
   };
 

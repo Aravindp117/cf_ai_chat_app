@@ -3,9 +3,9 @@
  */
 
 import { useState, useRef, useEffect } from 'react';
-import { chatApi } from '../api/client';
+import { chatApi, plansApi, sessionsApi } from '../api/client';
 import { useApp } from '../context/AppContext';
-import { plansApi } from '../api/client';
+import { parseCommand, isCommand, getCommandHelp } from '../utils/commands';
 
 interface Message {
   id: string;
@@ -30,10 +30,14 @@ export default function CommandChat() {
   };
 
   const handleCommand = async (command: string): Promise<string | null> => {
-    const trimmed = command.trim().toLowerCase();
+    const parsed = parseCommand(command);
+    if (!parsed) return null;
+
+    const cmd = parsed.command;
+    const args = parsed.args;
 
     // !today or !plan
-    if (trimmed === '!today' || trimmed === '!plan') {
+    if (cmd === 'today' || cmd === 'plan') {
       if (todayPlan) {
         const tasksSummary = todayPlan.tasks
           .map(
@@ -60,7 +64,7 @@ export default function CommandChat() {
     }
 
     // !goals
-    if (trimmed === '!goals') {
+    if (cmd === 'goals') {
       const activeGoals = goals.filter((g) => g.status === 'active');
       if (activeGoals.length === 0) {
         return '📚 You don\'t have any active goals yet. Create one to get started!';
@@ -77,7 +81,7 @@ export default function CommandChat() {
     }
 
     // !review
-    if (trimmed === '!review') {
+    if (cmd === 'review') {
       if (reviewTopics.length === 0) {
         return '✅ Great! No topics need review right now. Keep up the good work!';
       }
@@ -89,15 +93,66 @@ export default function CommandChat() {
     }
 
     // !help
-    if (trimmed === '!help' || trimmed === '!commands') {
-      return `🤖 **Available Commands:**
+    if (cmd === 'help' || cmd === 'commands') {
+      return getCommandHelp();
+    }
 
-\`!today\` or \`!plan\` - Show or generate today's study plan
-\`!goals\` - List all your active goals
-\`!review\` - Show topics that need review
-\`!help\` - Show this help message
+    // !add goal [title]
+    if (cmd === 'add' && args[0] === 'goal' && args.length >= 2) {
+      const title = args.slice(1).join(' ');
+      try {
+        // This would need a modal or follow-up prompts in a real implementation
+        return `📝 To create a goal "${title}", please use the Goals page or provide more details:\n- Type: exam/project/commitment\n- Deadline: YYYY-MM-DD\n- Priority: 1-5\n\nOr use the web interface for easier goal creation.`;
+      } catch (error) {
+        return '❌ Error creating goal. Please try again.';
+      }
+    }
 
-You can also chat normally with me about your studies!`;
+    // !log [topicName] [minutes]
+    if (cmd === 'log' && args.length >= 2) {
+      const topicName = args[0];
+      const minutes = parseInt(args[1]);
+      
+      if (isNaN(minutes) || minutes <= 0) {
+        return '❌ Invalid duration. Usage: !log [topicName] [minutes]';
+      }
+
+      // Find topic in goals
+      const allTopics = goals.flatMap(g => g.topics.map(t => ({ topic: t, goal: g })));
+      const topicMatch = allTopics.find(({ topic }) => 
+        topic.name.toLowerCase().includes(topicName.toLowerCase())
+      );
+
+      if (!topicMatch) {
+        return `❌ Topic "${topicName}" not found. Available topics:\n${allTopics.map(({ topic }) => `- ${topic.name}`).join('\n')}`;
+      }
+
+      try {
+        await sessionsApi.create({
+          topicId: topicMatch.topic.id,
+          goalId: topicMatch.goal.id,
+          durationMinutes: minutes,
+          notes: `Logged via chat command`,
+        });
+        refreshAll();
+        return `✅ Logged ${minutes} minutes of study for "${topicMatch.topic.name}"`;
+      } catch (error) {
+        return '❌ Error logging session. Please try again.';
+      }
+    }
+
+    // !generate or !refresh
+    if (cmd === 'generate' || cmd === 'refresh') {
+      try {
+        const plan = await plansApi.generate();
+        refreshAll();
+        const tasksSummary = plan.tasks
+          .map((t, i) => `${i + 1}. ${t.type === 'review' ? '🔄 Review' : t.type === 'study' ? '📚 Study' : '💼 Project'}: ${t.estimatedMinutes} min`)
+          .join('\n');
+        return `📅 **Generated New Plan**\n\n${plan.reasoning}\n\n**Tasks:**\n${tasksSummary}`;
+      } catch (error) {
+        return '❌ Error generating plan. Please try again.';
+      }
     }
 
     return null;
@@ -119,16 +174,26 @@ You can also chat normally with me about your studies!`;
 
     try {
       // Check for commands first
-      const commandResponse = await handleCommand(userMessage.text);
-      
-      if (commandResponse) {
-        const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
-          text: commandResponse,
-          sender: 'ai',
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, aiMessage]);
+      if (isCommand(userMessage.text)) {
+        const commandResponse = await handleCommand(userMessage.text);
+        
+        if (commandResponse) {
+          const aiMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: commandResponse,
+            sender: 'ai',
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, aiMessage]);
+        } else {
+          const errorMessage: Message = {
+            id: (Date.now() + 1).toString(),
+            text: '❌ Unknown command. Type !help for available commands.',
+            sender: 'ai',
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, errorMessage]);
+        }
       } else {
         // Not a command, send to AI
         const response = await chatApi.sendMessage(userMessage.text);
@@ -144,7 +209,7 @@ You can also chat normally with me about your studies!`;
       console.error('Error sending message:', error);
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
-        text: 'Sorry, there was an error. Please try again.',
+        text: `❌ Error: ${error instanceof Error ? error.message : 'Sorry, there was an error. Please try again.'}`,
         sender: 'ai',
         timestamp: new Date(),
       };
