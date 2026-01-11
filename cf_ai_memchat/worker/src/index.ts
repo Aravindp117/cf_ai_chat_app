@@ -603,6 +603,40 @@ app.get("/api/plan/:date", async (c) => {
 });
 
 /**
+ * DELETE /api/plan/:date - Delete daily plan for date (YYYY-MM-DD)
+ */
+app.delete("/api/plan/:date", async (c) => {
+  try {
+    const userId = c.get("userId");
+    const date = c.req.param("date");
+
+    // Validate date format (YYYY-MM-DD)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return c.json({ error: "Invalid date format. Use YYYY-MM-DD" }, 400);
+    }
+
+    const stub = getUserStateDO(c.env, userId);
+    const response = await stub.fetch(`https://internal/daily-plans/${date}`, {
+      method: "DELETE",
+    });
+
+    if (response.status === 404) {
+      return c.json({ error: "Plan not found for this date" }, 404);
+    }
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: "Failed to delete plan" }));
+      return c.json({ error: errorData.error || "Failed to delete plan" }, response.status);
+    }
+
+    return c.json({ success: true }, 200);
+  } catch (err: any) {
+    console.error("Delete plan error:", err);
+    return c.json({ error: err.message || "Internal server error" }, 500);
+  }
+});
+
+/**
  * POST /api/plan/generate - Generate today's plan using AI
  * Body: { date?: string (optional, defaults to today) }
  */
