@@ -1,5 +1,7 @@
 # Cloudflare AI Chat - Full Stack Application
 
+🌐 **Live Application**: [https://cloudflare-ai-chat-1kh.pages.dev/](https://cloudflare-ai-chat-1kh.pages.dev/)
+
 Complete frontend and backend for a Cloudflare AI Chat application with memory and an Agentic Study & Life Planner.
 
 ## Project Structure
