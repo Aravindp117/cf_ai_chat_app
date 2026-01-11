@@ -150,7 +150,7 @@ export default function Calendar({ viewMode: initialViewMode = 'week' }: Calenda
       return;
     }
 
-    if (!confirm(`Are you sure you want to delete the plan for ${format(dateObj, 'MMMM d, yyyy')}?`)) {
+    if (!confirm(`Are you sure you want to delete the plan for ${format(parseISO(date), 'MMMM d, yyyy')}?`)) {
       return;
     }
     try {
