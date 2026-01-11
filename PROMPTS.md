@@ -154,20 +154,7 @@ Create a Cloudflare Worker with the following API routes. Use Hono for routing.
 
 Create this in `src/index.ts` with clean, modular code.
 
-Also update `wrangler.toml` to include:
-```toml
-[[durable_objects.bindings]]
-name = "USER_STATE"
-class_name = "UserStateDO"
-script_name = "agentic-planner"
-
-[[migrations]]
-tag = "v1"
-new_classes = ["UserStateDO"]
-
-[ai]
-binding = "AI"
-```
+Also update `wrangler.toml` to include the Durable Object binding for USER_STATE with class_name UserStateDO, migrations tag v1, and AI binding.
 ```
 
 **Note**: Phase 3 was later enhanced to include the existing chat endpoint (`POST /api/chat`) with command detection. The plan generation was modified to use the existing Workers AI LLaMA model.
@@ -204,34 +191,9 @@ Create an AI agent module that generates intelligent daily plans using the EXIST
    - Prioritize: (1) red/orange decay topics, (2) urgent deadlines, (3) high-priority goals
    - Mix review and new learning
    - Use spaced repetition principles
-   - **IMPORTANT**: Return ONLY valid JSON in this exact format:
-```json
-   {
-     "tasks": [
-       {
-         "topicId": "topic-123",
-         "goalId": "goal-456",
-         "type": "review",
-         "estimatedMinutes": 45,
-         "priority": 5,
-         "reasoning": "This topic hasn't been reviewed in 15 days (red decay)"
-       }
-     ],
-     "reasoning": "Overall plan explanation focusing on urgent items first..."
-   }
-```
+   - **IMPORTANT**: Return ONLY valid JSON in this exact format with tasks array and reasoning string
 
-4. **Call Workers AI** (your existing binding):
-```typescript
-   const response = await ai.run('@cf/meta/llama-3.1-8b-instruct', {
-     messages: [
-       { role: 'system', content: systemPrompt },
-       { role: 'user', content: userPrompt }
-     ],
-     temperature: 0.7,
-     max_tokens: 1500
-   });
-```
+4. **Call Workers AI** using your existing binding with the model @cf/meta/llama-3.1-8b-instruct, temperature 0.7, max_tokens 1500
 
 5. **Parse LLM response**:
    - Extract JSON from response (handle markdown code blocks if present)
@@ -399,119 +361,19 @@ CURRENT ISSUES:
 I need you to create a COMPLETE, WORKING debugging and fix implementation.
 
 STEP 1: Create proper error logging and debugging infrastructure
-
-Create `src/debug.ts`:
-```typescript
-export const logger = {
-  info: (context: string, data: any) => {
-    console.log(`[${context}]`, JSON.stringify(data, null, 2));
-  },
-  error: (context: string, error: any) => {
-    console.error(`[ERROR: ${context}]`, error);
-    console.error('Stack:', error?.stack);
-  }
-};
-```
+Create a debug.ts file with logger utility functions for info and error logging with context and stack traces.
 
 STEP 2: Fix the Durable Object with proper error handling and logging
-
-Rewrite `src/durable-objects/UserStateDO.ts` with:
-- Comprehensive error logging for EVERY operation
-- Proper initialization of state (handle first-time users)
-- Validation of all inputs
-- Return proper error responses with details
-- Add a `fetch()` handler that routes to methods correctly
-- Make sure storage operations use `await` properly
-- Add console.log statements to track execution flow
-
-Key fixes needed:
-- Check if state exists before reading (handle null/undefined)
-- Validate goalId exists before operations
-- Return 404 with helpful message if goal not found
-- Return 500 with error details if operation fails
-- Initialize empty state for new users: `{ goals: [], sessions: [], dailyPlans: [] }`
+Rewrite UserStateDO.ts with comprehensive error logging for EVERY operation, proper initialization of state (handle first-time users), validation of all inputs, return proper error responses with details, add a fetch() handler that routes to methods correctly, make sure storage operations use await properly, add console.log statements to track execution flow. Key fixes needed: Check if state exists before reading (handle null/undefined), validate goalId exists before operations, return 404 with helpful message if goal not found, return 500 with error details if operation fails, initialize empty state for new users.
 
 STEP 3: Fix Worker API routes with comprehensive error handling
-
-Rewrite `src/index.ts` (or main worker file) to:
-- Add detailed logging at the START of each route
-- Log the Durable Object stub creation
-- Log before and after Durable Object calls
-- Catch and log ALL errors with full details
-- Add CORS headers properly
-- Validate request bodies before processing
-- Return detailed error messages (not just "internal error")
-
-For each route, add this pattern:
-```typescript
-app.post('/api/goals', async (c) => {
-  try {
-    console.log('=== POST /api/goals called ===');
-    
-    // Get userId
-    const userId = c.req.header('X-User-ID') || 'default-user';
-    console.log('User ID:', userId);
-    
-    // Parse body
-    const body = await c.req.json();
-    console.log('Request body:', body);
-    
-    // Validate
-    if (!body.title || !body.deadline) {
-      return c.json({ error: 'Missing required fields' }, 400);
-    }
-    
-    // Get DO stub
-    const id = c.env.USER_STATE.idFromName(userId);
-    const stub = c.env.USER_STATE.get(id);
-    console.log('DO stub created');
-    
-    // Call DO
-    const response = await stub.fetch('http://internal/addGoal', {
-      method: 'POST',
-      body: JSON.stringify(body)
-    });
-    console.log('DO response status:', response.status);
-    
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('DO returned error:', error);
-      return c.json({ error }, response.status);
-    }
-    
-    const result = await response.json();
-    console.log('Success:', result);
-    return c.json(result);
-    
-  } catch (error) {
-    console.error('Route error:', error);
-    return c.json({ error: error.message, stack: error.stack }, 500);
-  }
-});
-```
-
-Apply this pattern to ALL routes.
+Rewrite index.ts (or main worker file) to add detailed logging at the START of each route, log the Durable Object stub creation, log before and after Durable Object calls, catch and log ALL errors with full details, add CORS headers properly, validate request bodies before processing, return detailed error messages (not just "internal error"). Apply this pattern to ALL routes.
 
 STEP 4: Fix frontend API client with retry logic and detailed error messages
-
-Rewrite `src/api/client.ts`:
-- Add detailed console.logs for every request
-- Log request URL, method, headers, body
-- Log response status and body
-- Show user-friendly error messages in UI (use toast/alert)
-- Add loading states
-- Handle network errors separately from API errors
-- Add retry logic for 500 errors
+Rewrite api/client.ts to add detailed console.logs for every request, log request URL, method, headers, body, log response status and body, show user-friendly error messages in UI (use toast/alert), add loading states, handle network errors separately from API errors, add retry logic for 500 errors.
 
 STEP 5: Fix React components with proper async handling
-
-Update button handlers in components to:
-- Add loading states (disabled during operations)
-- Show loading spinner/text
-- Display success/error feedback
-- Properly await async operations
-- Refresh data after mutations
-- Add try-catch around all async calls
+Update button handlers in components to add loading states (disabled during operations), show loading spinner/text, display success/error feedback, properly await async operations, refresh data after mutations, add try-catch around all async calls.
 
 STEP 6: Ensure Durable Object binding is correct
 
