@@ -113,15 +113,17 @@ export default function DailyPlanView({ plan, onRefresh }: DailyPlanViewProps) {
         <div className="flex gap-2 flex-shrink-0">
           <button
             onClick={handleDelete}
-            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm sm:text-base font-medium transition-colors whitespace-nowrap"
+            disabled={isDeleting}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm sm:text-base font-medium transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Delete Plan
+            {isDeleting ? 'Deleting...' : 'Delete Plan'}
           </button>
           <button
             onClick={handleGenerate}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm sm:text-base font-medium transition-colors whitespace-nowrap"
+            disabled={isGenerating}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm sm:text-base font-medium transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Regenerate
+            {isGenerating ? 'Generating...' : 'Regenerate'}
           </button>
         </div>
       </div>
