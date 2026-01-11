@@ -342,7 +342,16 @@ export default function Calendar({ viewMode: initialViewMode = 'week' }: Calenda
                 )}
               </div>
 
-              {plan && plan.tasks.length > 0 ? (
+              {isGenerating ? (
+                <div className="flex flex-col items-center justify-center py-4">
+                  <div className="flex space-x-1 mb-2">
+                    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  </div>
+                  <span className="text-xs text-blue-600 dark:text-blue-400">Generating...</span>
+                </div>
+              ) : plan && plan.tasks.length > 0 ? (
                 <div className="space-y-1">
                   {plan.tasks.slice(0, 3).map((task, index) => {
                     const topicName = getTopicName(task);
